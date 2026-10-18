@@ -9,7 +9,10 @@ index.html          the page
 style.css           all the design (colors are at the top)
 js/main.js          the game: racing, nitro, results, menus
 js/words.js         word list, quotes, slang, code lines, daily challenge
-js/cars.js          the garage: cars + how to unlock them
+js/cars.js          the garage: sports cars (drawn in code) + unlock rules
+js/icons.js         line icons + the logo mark
+js/keyboard.js      the on-screen keyboard with the reacting spacebar face
+favicon.svg         the logo icon
 js/audio.js         sound effects (made in code, no audio files)
 js/stats.js         the stats page + chart
 js/share.js         the shareable result image

@@ -1,7 +1,9 @@
 import { makeText, dailyText, todayKey } from "./words.js";
 import { settings, saveSettings, profile, saveProfile, runs, addRun, dayStreak } from "./store.js";
 import * as audio from "./audio.js";
-import { CARS, carSVG, carById, checkUnlocks } from "./cars.js";
+import { CARS, carSVG, carById, carDot, checkUnlocks } from "./cars.js";
+import { icon, markSVG } from "./icons.js";
+import * as kb from "./keyboard.js";
 import { renderStats } from "./stats.js";
 import { shareCard } from "./share.js";
 import { online, leaderboard, topGhost, submit, rankToday } from "./online.js";
@@ -12,27 +14,30 @@ const $$ = s => [...document.querySelectorAll(s)];
 const inp = $("#inp"), textEl = $("#text"), track = $("#track"), typebox = $("#typebox");
 
 const BOTS = [
-  { name: "grandma.exe", emoji: "🐢", wpm: 28, color: "var(--c1)" },
-  { name: "npc", emoji: "🤖", wpm: 46, color: "var(--c2)" },
-  { name: "tryhard", emoji: "💀", wpm: 74, color: "var(--c3)" },
+  { name: "grandma.exe", wpm: 28, car: { shape: "retro", color: "var(--c1)" } },
+  { name: "npc", wpm: 46, car: { shape: "gt", color: "var(--c2)" } },
+  { name: "tryhard", wpm: 74, car: { shape: "hyper", color: "var(--c3)", wing: true } },
 ];
+const BOT_DOT = { "var(--c1)": "#A99BFF", "var(--c2)": "#5BB8FF", "var(--c3)": "#3DD68C" };
 const VIBES = [
-  [20, "touch keyboard. then grass. 🌱"],
-  [35, "warming up era ☕"],
-  [50, "mid but make it cute ✨"],
-  [65, "kinda fast ngl 👀"],
-  [80, "main character energy 💅"],
-  [100, "keyboard demon unlocked 😈"],
-  [130, "are you even human?? 🤖"],
-  [Infinity, "literally a speedrun 🏆"],
+  [20, "touch keyboard, then grass"],
+  [35, "warming up era"],
+  [50, "mid, but make it cute"],
+  [65, "kinda fast ngl"],
+  [80, "main character energy"],
+  [100, "keyboard demon unlocked"],
+  [130, "are you even human?"],
+  [Infinity, "literally a speedrun"],
 ];
 const CONTENT_LABEL = { words: "words", quotes: "quotes", slang: "slang", code: "code", punct: "punctuation" };
 const NITRO_EVERY = 10;   // clean words in a row
 const NITRO_MS = 2500;
+const GAUGE_MAX = 160;
 const NAME_RE = /^[\p{L}\p{N}_ .-]{1,16}$/u;
 
 let race = null, chars = [], base = [];
 let shownWpm = 0, lastStat = 0, roadOff = 0, lastFrame = 0, lastKey = 0, lastSend = 0;
+let lastPhysical = 0, lastErrorAt = 0;
 let lastResult = null, mpLength = "race", afterName = null;
 let boardMode = "race", boardPeriod = "today";
 const ghostCache = {};
@@ -42,6 +47,7 @@ const esc = s => String(s).replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;"
 const ordinal = n => n + ({ 1: "st", 2: "nd", 3: "rd" }[n] || "th");
 const correctLen = (a, b) => { let i = 0; while (i < a.length && a[i] === b[i]) i++; return i; };
 const modalOpen = () => !!$(".modal.show");
+const resultsOpen = () => $("#results").classList.contains("show");
 
 function toast(msg, ms = 2200) {
   const t = $("#toast");
@@ -75,31 +81,49 @@ $("#theme").onclick = () => {
 
 function applySound() {
   audio.setMuted(settings.muted);
-  $("#sound").textContent = settings.muted ? "🔇" : "🔊";
+  $("#sound").innerHTML = icon(settings.muted ? "mute" : "sound");
 }
 $("#sound").onclick = () => { settings.muted = !settings.muted; saveSettings(); applySound(); focusInput(); };
 
 /* ---------- mode controls ---------- */
 function syncControls() {
-  $$("#contentPills .pill").forEach(p => p.classList.toggle("on", p.dataset.content === settings.content));
-  $$("#lengthPills .pill").forEach(p => p.classList.toggle("on", p.dataset.length === settings.length));
+  $$("#contentPills button").forEach(p => p.classList.toggle("on", p.dataset.content === settings.content));
+  $$("#lengthPills button").forEach(p => p.classList.toggle("on", p.dataset.length === settings.length));
   $("#daily").classList.toggle("on", settings.daily);
   $("#controls").classList.toggle("is-daily", settings.daily);
 }
-$$("#contentPills .pill").forEach(p => p.onclick = () => {
+$$("#contentPills button").forEach(p => p.onclick = () => {
   settings.content = p.dataset.content; settings.daily = false; saveSettings(); newRace();
 });
-$$("#lengthPills .pill").forEach(p => p.onclick = () => {
+$$("#lengthPills button").forEach(p => p.onclick = () => {
   settings.length = p.dataset.length; settings.daily = false; saveSettings(); newRace();
 });
 $("#daily").onclick = () => { settings.daily = !settings.daily; saveSettings(); newRace(); };
 
 function updateHint() {
   const el = $("#hintRank");
-  if (race.kind === "mp") el.textContent = "👥 live race";
-  else if (race.daily) el.textContent = `📅 daily challenge · ${race.day}`;
-  else if (online) el.textContent = race.eligible ? "🌍 counts for the leaderboard" : "practice mode";
+  if (race.kind === "mp") el.textContent = "live race";
+  else if (race.daily) el.textContent = `daily challenge · ${race.day}`;
+  else if (online) el.textContent = race.eligible ? "counts for the leaderboard" : "practice mode";
   else el.textContent = "";
+}
+
+/* ---------- speedometer ---------- */
+function buildGauge() {
+  let s = "";
+  for (let v = 0; v <= GAUGE_MAX; v += 10) {
+    const a = ((-120 + (v / GAUGE_MAX) * 240) * Math.PI) / 180, major = v % 40 === 0;
+    const r1 = major ? 52 : 55.5, r2 = 59.5;
+    s += `<line class="tk${major ? " major" : ""}" x1="${(80 + r1 * Math.sin(a)).toFixed(1)}" y1="${(80 - r1 * Math.cos(a)).toFixed(1)}" x2="${(80 + r2 * Math.sin(a)).toFixed(1)}" y2="${(80 - r2 * Math.cos(a)).toFixed(1)}"/>`;
+    if (major) s += `<text class="g-lbl" x="${(80 + 42 * Math.sin(a)).toFixed(1)}" y="${(80 - 42 * Math.cos(a) + 3).toFixed(1)}">${v}</text>`;
+  }
+  $("#gTicks").innerHTML = s;
+}
+
+function setGauge(wpm) {
+  const p = Math.min(wpm, GAUGE_MAX) / GAUGE_MAX;
+  $("#gNeedle").style.transform = `rotate(${-120 + p * 240}deg)`;
+  $("#gFill").style.strokeDashoffset = String(100 - p * 100);
 }
 
 /* ---------- building a race ---------- */
@@ -139,7 +163,7 @@ function newRace(sameText) {
   });
   race.racers = [meRacer(), ...BOTS.map(b => ({ ...b, wpm: Math.round(b.wpm * (0.9 + Math.random() * 0.2)), p: 0 }))];
   const pb = profile.pb[race.pbKey];
-  if (pb) race.racers.push({ name: "your pb", emoji: "👻", wpm: pb, car: carById(settings.car), ghost: true, p: 0 });
+  if (pb) race.racers.push({ name: "your best", icon: "ghost", wpm: pb, car: carById(settings.car), ghost: true, p: 0 });
   race.racers.forEach(setFinishTime);
   setupScreen();
   addTopGhost(race);
@@ -162,7 +186,7 @@ async function addTopGhost(r) {
   }
   const g = ghostCache[r.board];
   if (!g || !Array.isArray(g.timeline) || g.timeline.length < 2 || race !== r || r.started) return;
-  const ghost = { name: `#1 ${g.name}`, emoji: "🌍", wpm: g.wpm, car: carById(g.car), ghost: true, replay: g.timeline, ri: 0, p: 0 };
+  const ghost = { name: `#1 ${g.name}`, icon: "globe", wpm: g.wpm, car: carById(g.car), ghost: true, replay: g.timeline, ri: 0, p: 0 };
   setFinishTime(ghost);
   r.racers.push(ghost);
   buildTrack();
@@ -173,10 +197,11 @@ function buildTrack() {
   for (const r of race.racers) {
     const lane = document.createElement("div");
     lane.className = "lane";
-    const label = r.you
-      ? (race.kind === "mp" ? `${esc(profile.name)} (you)` : "you")
-      : `${r.emoji ? r.emoji + " " : ""}${esc(r.name)}${r.wpm ? ` <span class="w">${r.wpm}</span>` : ""}`;
-    lane.innerHTML = `<span class="tag">${label}</span><div class="car${r.ghost ? " ghost" : ""}${r.you ? " me" : ""}">${carSVG(r.car || { color: r.color })}</div>`;
+    const marker = r.icon ? icon(r.icon) : `<i class="d" style="background:${BOT_DOT[r.car.color] || carDot(r.car)}"></i>`;
+    const name = r.you ? (race.kind === "mp" ? `${esc(profile.name)} (you)` : "you") : esc(r.name);
+    const speed = !r.you && r.wpm ? `<span class="w">${r.wpm}</span>` : "";
+    lane.innerHTML = `<span class="tag${r.you ? " me" : ""}">${marker}${name}${speed}</span>
+      <div class="car${r.ghost ? " ghost" : ""}${r.you ? " me" : ""}">${carSVG(r.car)}</div>`;
     track.appendChild(lane);
     r.lane = lane;
     r.carEl = lane.querySelector(".car");
@@ -209,19 +234,24 @@ function paint() {
     const lineH = parseFloat(getComputedStyle(textEl).lineHeight);
     textEl.scrollTop = Math.max(0, cur.offsetTop - textEl.offsetTop - lineH);
   }
+  if (race.done || !race.live) kb.setNext(null);
+  else if (correctLen(typed, text) < typed.length) kb.setNext("bksp");
+  else kb.setNext(text[typed.length] ?? null);
 }
 
 function setStats(wpm, acc, secs) {
   $("#wpm").textContent = Math.round(wpm);
   $("#acc").textContent = Math.round(acc);
   $("#time").textContent = secs.toFixed(1);
+  setGauge(wpm);
 }
 
 function setCombo() {
   const boosting = race.nitroUntil > performance.now();
-  $("#combo").textContent = race.combo;
-  $("#combo").classList.toggle("hot", boosting);
-  $("#meter").style.width = boosting ? "100%" : ((race.combo % NITRO_EVERY) / NITRO_EVERY) * 100 + "%";
+  const filled = race.combo % NITRO_EVERY;
+  $("#combo").textContent = race.combo ? `x${race.combo}` : "";
+  $("#meter").classList.toggle("hot", boosting);
+  [...$("#meter").children].forEach((b, i) => b.classList.toggle("on", i < filled));
 }
 
 function resetStats() {
@@ -231,14 +261,14 @@ function resetStats() {
 }
 
 function focusInput() {
-  if (!modalOpen() && !$("#results").classList.contains("show")) inp.focus();
+  if (!modalOpen() && !resultsOpen()) inp.focus();
 }
 
 /* ---------- typing ---------- */
 inp.addEventListener("beforeinput", e => {
   if (e.inputType === "insertFromPaste" || e.inputType === "insertFromDrop") {
     e.preventDefault();
-    toast("no pasting, nice try 😭");
+    toast("No pasting. Nice try.");
   }
 });
 inp.addEventListener("paste", e => e.preventDefault());
@@ -255,12 +285,14 @@ inp.addEventListener("input", () => {
 
   if (!r.started && v.length) startClock();
 
-  let gotError = false;
+  let wrongChar = null;
   for (let i = r.typed.length; i < v.length; i++) {
     r.keys++;
-    if (v[i] !== r.text[i]) { r.errors++; gotError = true; }
+    if (v[i] !== r.text[i]) { r.errors++; wrongChar = v[i]; }
   }
   const added = v.length > r.typed.length;
+  const physical = performance.now() - lastPhysical < 80;
+  if (added && !physical) kb.tap(kb.keyFor(v[v.length - 1]).k);  // phones: no key events, so flash the key
   r.typed = v;
   inp.value = v;
 
@@ -269,8 +301,13 @@ inp.addEventListener("input", () => {
   const cl = correctLen(v, r.text);
   while (r.maxCorrect < cl) r.times[r.maxCorrect++] = now;
 
-  if (gotError) { r.combo = 0; r.errAtWord = r.errors; audio.sfx.error(); }
-  else if (added) audio.sfx.key();
+  if (wrongChar != null) {
+    r.combo = 0;
+    r.errAtWord = r.errors;
+    lastErrorAt = performance.now();
+    kb.wrong(kb.keyFor(wrongChar).k);
+    audio.sfx.error();
+  } else if (added) audio.sfx.key();
 
   // a word counts as "clean" if no typo happened while typing it
   while (r.words < r.ends.length && cl >= r.ends[r.words]) {
@@ -300,7 +337,7 @@ function startClock() {
 function nitro() {
   race.nitros++;
   race.nitroUntil = performance.now() + NITRO_MS;
-  race.boost = 48;
+  race.boost = 52;
   audio.sfx.nitro();
   const b = $("#boost");
   b.classList.remove("show");
@@ -314,8 +351,17 @@ function nitro() {
 function markDone(r) {
   if (r.lane.classList.contains("done")) return;
   const place = race.racers.filter(x => x.lane.classList.contains("done")).length + 1;
-  r.lane.dataset.place = ordinal(place);
+  r.lane.querySelector(".tag").dataset.place = "P" + place;
   r.lane.classList.add("done");
+  r.carEl.classList.add("parked");
+}
+
+function moodFor(r, now) {
+  if (r.nitroUntil > now) return "nitro";
+  if (now - lastErrorAt < 700) return "oops";
+  if (r.done) return "happy";
+  if (r.started) return now - lastKey < 1500 && r.combo >= 3 ? "happy" : "idle";
+  return now - lastKey > 9000 ? "sleep" : "idle";
 }
 
 function tick(now) {
@@ -333,12 +379,14 @@ function tick(now) {
     track.classList.remove("boosting");
     setCombo();
   }
+  kb.setMood(moodFor(r, now));
 
   if (r.started && !r.done) {
     const ms = now - r.t0, secs = ms / 1000;
     const cl = correctLen(r.typed, r.text);
     const wpm = secs > 0.4 ? (cl / 5) / (secs / 60) : 0;
-    shownWpm += (wpm - shownWpm) * 0.15;
+    shownWpm += (wpm - shownWpm) * (1 - Math.exp(-(now - (r.lastSmooth || now)) / 120));
+    r.lastSmooth = now;
     for (const x of r.racers) {
       if (x.you) x.p = cl / r.text.length;
       else if (x.remote) continue;
@@ -364,7 +412,7 @@ function tick(now) {
   if (!boosting) r.boost *= 0.93;
   for (const x of r.racers) {
     if (!x.carEl) continue;
-    const max = x.lane.clientWidth - x.carEl.offsetWidth - 14;
+    const max = x.lane.clientWidth - x.carEl.offsetWidth;
     const bonus = x.you && !r.done ? Math.min(r.boost, max * (1 - x.p)) : 0;
     x.x += (x.p * max + bonus - x.x) * 0.25;
     x.carEl.style.transform = `translateX(${x.x}px)`;
@@ -393,6 +441,7 @@ function finish() {
   audio.engineStop();
   audio.sfx.finish();
   setStats(wpm, acc, secs);
+  kb.setNext(null);
   if (r.kind === "mp") mp.send("finish", { id: profile.id, time: secs, wpm });
 
   const place = 1 + r.racers.filter(x => !x.you && x.finT != null && x.finT < secs).length;
@@ -411,34 +460,36 @@ function finish() {
   }
 
   const vibe = VIBES.find(v => wpm < v[0])[1];
-  const placeText = place === 1 ? "you placed 1st 🏆" : `you placed ${ordinal(place)} of ${r.racers.length}`;
-  lastResult = { wpm, acc, secs, nitros: r.nitros, placeText, vibe, car: carById(settings.car), label: modeLabel(r) };
+  const placeText = `${ordinal(place)} of ${r.racers.length}`;
+  lastResult = { wpm, acc, secs, nitros: r.nitros, place, placeText, vibe, car: carById(settings.car), label: modeLabel(r) };
 
-  $("#r-place").textContent = placeText;
+  $("#r-pos").textContent = "P" + place;
+  $("#r-place").textContent = place === 1 ? "You won the race" : `You finished ${placeText}`;
+  $("#r-mode").textContent = modeLabel(r);
   $("#r-wpm").textContent = wpm;
-  $("#r-pb").textContent = isPb ? "✦ new personal best ✦" : "";
+  $("#r-pb").innerHTML = isPb ? `${icon("sparkle")}new personal best` : "";
   $("#r-vibe").textContent = vibe;
   $("#r-acc").textContent = acc + "%";
   $("#r-time").textContent = secs.toFixed(1) + "s";
   $("#r-err").textContent = r.errors;
-  $("#r-extra").textContent = `🔥 ${r.nitros} nitro${r.nitros === 1 ? "" : "s"} · best combo ${r.bestCombo} words`;
-  $("#r-unlocks").innerHTML = fresh.map(c => `<div class="unlock">${carSVG(c)}<span>🔓 unlocked <b>${esc(c.name)}</b>, check the garage</span></div>`).join("");
+  $("#r-extra").innerHTML = `${icon("flame")}${r.nitros} nitro${r.nitros === 1 ? "" : "s"} · best combo ${r.bestCombo} words`;
+  $("#r-unlocks").innerHTML = fresh.map(c => `<div class="unlock">${carSVG(c)}<span>Unlocked <b>${esc(c.name)}</b>. Check the garage.</span></div>`).join("");
   if (fresh.length) setTimeout(audio.sfx.unlock, 700);
-  $("#again").textContent = r.kind === "mp" ? "back to lobby ↵" : "run it back ↵";
-  $("#share").textContent = "share card";
+  $("#again span").textContent = r.kind === "mp" ? "back to lobby" : "run it back";
+  $("#share span").textContent = "share card";
   onlineLine(r, wpm, acc);
   inp.blur();
-  setTimeout(() => { if (race === r) $("#results").classList.add("show"); }, 450);
+  setTimeout(() => { if (race === r) $("#results").classList.add("show"); }, 500);
 }
 
 function onlineLine(r, wpm, acc) {
   const el = $("#r-online");
   el.textContent = "";
-  if (r.flagged) { el.textContent = "paste detected, this run doesn't count 🚫"; return; }
+  if (r.flagged) { el.textContent = "Paste detected, so this run doesn't count."; return; }
   if (!online || r.kind === "mp") return;
-  if (!r.eligible) { el.textContent = "practice mode · leaderboard is words + daily only"; return; }
+  if (!r.eligible) { el.textContent = "Practice mode. The leaderboard counts words and daily only."; return; }
   if (!profile.name) {
-    el.innerHTML = `<button class="link" id="postBtn">🌍 post this to the leaderboard</button>`;
+    el.innerHTML = `<button class="link" id="postBtn">${icon("globe")}post this to the leaderboard</button>`;
     $("#postBtn").onclick = () => askName(() => { $("#results").classList.add("show"); postScore(r, wpm, acc); });
     return;
   }
@@ -447,14 +498,14 @@ function onlineLine(r, wpm, acc) {
 
 async function postScore(r, wpm, acc) {
   const el = $("#r-online");
-  el.textContent = "posting to the leaderboard…";
+  el.textContent = "Posting to the leaderboard…";
   try {
     await submit({ name: profile.name, mode: r.board, text: r.text, times: r.times, acc, car: settings.car, day: r.day });
     delete ghostCache[r.board];
     const rank = await rankToday(r.board, wpm);
-    el.textContent = `🌍 you're #${rank} today on the ${r.board} board`;
+    el.innerHTML = `${icon("globe")}You're #${rank} today on the ${r.board} board`;
   } catch (e) {
-    el.textContent = `couldn't post: ${e.message}`;
+    el.textContent = `Couldn't post: ${e.message}`;
   }
 }
 
@@ -468,13 +519,13 @@ $("#again").onclick = again;
 
 $("#share").onclick = async () => {
   if (!lastResult) return;
-  const b = $("#share");
-  b.textContent = "making card…";
+  const label = $("#share span");
+  label.textContent = "making card…";
   try {
     const how = await shareCard(lastResult);
-    b.textContent = how === "downloaded" ? "saved ✓" : "shared ✓";
+    label.textContent = how === "downloaded" ? "saved" : "shared";
   } catch (e) {
-    b.textContent = "share card";
+    label.textContent = "share card";
   }
 };
 
@@ -485,6 +536,7 @@ function openModal(id) {
   closeModals();
   $("#m-" + id).classList.add("show");
   inp.blur();
+  kb.releaseAll();
   if (RENDER[id]) RENDER[id]();
 }
 function closeModals() { $$(".modal.show").forEach(m => m.classList.remove("show")); }
@@ -505,7 +557,7 @@ function askName(then) {
 }
 function saveName() {
   const v = $("#nameInput").value.trim();
-  if (!NAME_RE.test(v)) { toast("letters, numbers, spaces, _ . - only (max 16)"); return; }
+  if (!NAME_RE.test(v)) { toast("Letters, numbers, spaces, _ . - only (max 16)"); return; }
   profile.name = v;
   saveProfile();
   mp.updateMe({ name: v });
@@ -522,8 +574,9 @@ const withName = fn => (profile.name ? fn() : askName(fn));
 function renderGarage() {
   $("#garageGrid").innerHTML = CARS.map(c => {
     const has = profile.unlocked.includes(c.id), on = settings.car === c.id;
+    const status = !has ? `${icon("lock")}${esc(c.how)}` : on ? `${icon("check")}driving` : "tap to drive";
     return `<button class="slot${has ? "" : " locked"}${on ? " on" : ""}" data-car="${c.id}"${has ? "" : " disabled"}>
-      ${carSVG(c)}<b>${esc(c.name)}</b><span>${has ? (on ? "driving ✓" : "tap to drive") : "🔒 " + esc(c.how)}</span></button>`;
+      <div class="stage">${carSVG(c)}</div><b>${esc(c.name)}</b><span>${status}</span></button>`;
   }).join("");
   $$("#garageGrid .slot:not(.locked)").forEach(s => s.onclick = () => {
     settings.car = s.dataset.car;
@@ -532,7 +585,7 @@ function renderGarage() {
     renderGarage();
     if (race && !race.started) {
       race.racers[0].car = carById(settings.car);
-      race.racers.filter(x => x.name === "your pb").forEach(x => x.car = race.racers[0].car);
+      race.racers.filter(x => x.icon === "ghost").forEach(x => (x.car = race.racers[0].car));
       buildTrack();
     }
   });
@@ -540,34 +593,34 @@ function renderGarage() {
 
 /* leaderboard */
 function syncBoardTabs() {
-  $$("#boardMode .pill").forEach(p => p.classList.toggle("on", p.dataset.v === boardMode));
-  $$("#boardPeriod .pill").forEach(p => p.classList.toggle("on", p.dataset.v === boardPeriod));
+  $$("#boardMode button").forEach(p => p.classList.toggle("on", p.dataset.v === boardMode));
+  $$("#boardPeriod button").forEach(p => p.classList.toggle("on", p.dataset.v === boardPeriod));
   $("#boardPeriod").hidden = boardMode === "daily";
 }
-$$("#boardMode .pill").forEach(p => p.onclick = () => { boardMode = p.dataset.v; renderBoard(); });
-$$("#boardPeriod .pill").forEach(p => p.onclick = () => { boardPeriod = p.dataset.v; renderBoard(); });
+$$("#boardMode button").forEach(p => p.onclick = () => { boardMode = p.dataset.v; renderBoard(); });
+$$("#boardPeriod button").forEach(p => p.onclick = () => { boardPeriod = p.dataset.v; renderBoard(); });
 
 async function renderBoard() {
   syncBoardTabs();
   const body = $("#boardBody");
   if (!online) {
-    body.innerHTML = `<p class="empty">the leaderboard isn't switched on yet.<br>follow step 2 in the README to connect supabase (free, ~10 min).</p>`;
+    body.innerHTML = `<p class="empty">The leaderboard isn't switched on yet.<br>Follow step 2 in the README to connect Supabase.</p>`;
     return;
   }
-  body.innerHTML = `<p class="empty">loading…</p>`;
+  body.innerHTML = `<p class="empty">Loading…</p>`;
   const want = boardMode + boardPeriod;
   try {
     const rows = await leaderboard(boardMode, boardMode === "daily" ? "today" : boardPeriod);
     if (want !== boardMode + boardPeriod) return;
-    if (!rows.length) { body.innerHTML = `<p class="empty">no scores yet. be the first 👀</p>`; return; }
+    if (!rows.length) { body.innerHTML = `<p class="empty">No scores yet. Be the first.</p>`; return; }
     const me = profile.name.toLowerCase();
     body.innerHTML = `<ol class="board">${rows.map((r, i) => `
       <li class="${me && r.name.toLowerCase() === me ? "me" : ""}">
         <span class="rk">${i + 1}</span><span class="mini">${carSVG(carById(r.car))}</span>
-        <span class="nm">${esc(r.name)}</span><span class="wp">${r.wpm}<small>wpm</small></span><span class="ac">${r.acc}%</span>
+        <span class="nm">${esc(r.name)}</span><span class="wp">${r.wpm}<small>WPM</small></span><span class="ac">${r.acc}%</span>
       </li>`).join("")}</ol>`;
   } catch (e) {
-    body.innerHTML = `<p class="empty">couldn't load the leaderboard 😵</p>`;
+    body.innerHTML = `<p class="empty">Couldn't load the leaderboard.</p>`;
   }
 }
 
@@ -583,20 +636,20 @@ $("#roomChip").onclick = () => openModal("mp");
 function renderLobby() {
   const body = $("#mpBody");
   if (!online) {
-    body.innerHTML = `<p class="empty">live rooms need the free supabase setup first.<br>see step 2 in the README.</p>`;
+    body.innerHTML = `<p class="empty">Live rooms need the free Supabase setup first.<br>See step 2 in the README.</p>`;
     return;
   }
   if (!mp.room()) {
     body.innerHTML = `
-      <p class="sub">make a room, send the link, race your friends live.</p>
-      <button class="btn primary full" id="mpCreate">create a room</button>
+      <p class="sub">Make a room, send the link, race your friends live.</p>
+      <button class="btn accent full" id="mpCreate">${icon("flag")}create a room</button>
       <div class="or">or join one</div>
       <div class="joinrow"><input class="field" id="mpCode" maxlength="4" placeholder="CODE" autocomplete="off"><button class="btn small" id="mpJoin">join</button></div>`;
     $("#mpCreate").onclick = () => withName(() => enterRoom(mp.newCode()));
     const join = () => {
       const c = $("#mpCode").value.trim().toUpperCase();
       if (/^[A-Z]{4}$/.test(c)) withName(() => enterRoom(c));
-      else toast("room codes are 4 letters");
+      else toast("Room codes are 4 letters");
     };
     $("#mpJoin").onclick = join;
     $("#mpCode").addEventListener("keydown", e => { if (e.key === "Enter") join(); });
@@ -604,25 +657,25 @@ function renderLobby() {
   }
   const list = mp.players(), host = mp.isHost();
   body.innerHTML = `
-    <div class="roomcode"><span>room</span><b>${mp.room()}</b><button class="btn small" id="mpCopy">copy invite link</button></div>
-    <ul class="players">${list.map((p, i) => `<li><span class="mini">${carSVG(carById(p.car))}</span><span>${esc(p.name)}${p.id === profile.id ? " (you)" : ""}</span>${i === 0 ? "<em>host</em>" : ""}</li>`).join("")}</ul>
+    <div class="roomcode"><div><span>room code</span><br><b>${mp.room()}</b></div><button class="btn small" id="mpCopy">${icon("link")}copy invite</button></div>
+    <ul class="players">${list.map((p, i) => `<li><span class="mini">${carSVG(carById(p.car))}</span><span>${esc(p.name)}${p.id === profile.id ? " (you)" : ""}</span>${i === 0 ? `<em>${icon("crown")}host</em>` : ""}</li>`).join("")}</ul>
     ${host
-      ? `<div class="pills center" id="mpLen">${["sprint", "race", "marathon"].map(l => `<button class="pill${l === mpLength ? " on" : ""}" data-l="${l}">${l}</button>`).join("")}</div>
-         <button class="btn primary full" id="mpStart">start race 🏁</button>`
-      : `<p class="sub">waiting for the host to start…</p>`}
-    <button class="link" id="mpLeave">leave room</button>`;
+      ? `<div class="lobby-len"><div class="seg small" id="mpLen">${["sprint", "race", "marathon"].map(l => `<button class="${l === mpLength ? "on" : ""}" data-l="${l}">${l}</button>`).join("")}</div></div>
+         <button class="btn accent full" id="mpStart">${icon("flag")}start race</button>`
+      : `<p class="sub" style="text-align:center">Waiting for the host to start…</p>`}
+    <div class="center"><button class="link" id="mpLeave">leave room</button></div>`;
   $("#mpCopy").onclick = async () => {
     const url = `${location.origin}${location.pathname}?room=${mp.room()}`;
-    try { await navigator.clipboard.writeText(url); toast("invite link copied 🔗"); } catch (e) { toast(url, 5000); }
+    try { await navigator.clipboard.writeText(url); toast("Invite link copied"); } catch (e) { toast(url, 5000); }
   };
-  $$("#mpLen .pill").forEach(p => p.onclick = () => { mpLength = p.dataset.l; renderLobby(); });
+  $$("#mpLen button").forEach(p => p.onclick = () => { mpLength = p.dataset.l; renderLobby(); });
   if (host) $("#mpStart").onclick = () => mp.send("start", { text: makeText("words", mpLength), length: mpLength });
   $("#mpLeave").onclick = leaveRoom;
 }
 
 async function enterRoom(code) {
   openModal("mp");
-  $("#mpBody").innerHTML = `<p class="empty">joining ${code}…</p>`;
+  $("#mpBody").innerHTML = `<p class="empty">Joining ${code}…</p>`;
   try {
     await mp.joinRoom(code, { id: profile.id, name: profile.name, car: settings.car }, {
       players: () => { if ($("#m-mp").classList.contains("show")) renderLobby(); },
@@ -635,7 +688,7 @@ async function enterRoom(code) {
         const x = race && race.kind === "mp" && race.racers.find(r => r.id === id && !r.you);
         if (!x) return;
         x.p = 1; x.finT = time; x.wpm = wpm;
-        x.lane.querySelector(".tag").insertAdjacentHTML("beforeend", ` <span class="w">${wpm}</span>`);
+        x.lane.querySelector(".tag").insertAdjacentHTML("beforeend", `<span class="w">${wpm}</span>`);
         markDone(x);
       },
     });
@@ -644,7 +697,7 @@ async function enterRoom(code) {
     history.replaceState(null, "", u);
   } catch (e) {
     await mp.leaveRoom();
-    toast("couldn't join that room 😵");
+    toast("Couldn't join that room");
   }
   roomUI();
   renderLobby();
@@ -672,36 +725,37 @@ function startMpRace({ text, length }) {
   ];
   setupScreen();
   const r = race;
-  countdown(() => {
+  startLights(() => {
     if (race !== r) return;
     r.live = true;
     typebox.classList.remove("waiting");
     startClock();
+    paint();
     focusInput();
   });
 }
 
-function countdown(go) {
-  const el = $("#countdown");
-  let n = 3;
+// F1-style start: three red lights, then green.
+function startLights(go) {
+  const el = $("#lights"), bulbs = [...el.children];
+  el.classList.remove("go");
+  bulbs.forEach(b => b.classList.remove("red"));
+  el.classList.add("show");
+  let n = 0;
   const step = () => {
-    el.className = "countdown";
-    void el.offsetWidth;
-    if (n > 0) {
-      el.textContent = n;
-      el.className = "countdown show pop";
+    if (n < bulbs.length) {
+      bulbs[n++].classList.add("red");
       audio.sfx.beep(false);
-      n--;
       setTimeout(step, 800);
     } else {
-      el.textContent = "go!";
-      el.className = "countdown show pop go";
+      bulbs.forEach(b => b.classList.remove("red"));
+      el.classList.add("go");
       audio.sfx.beep(true);
       go();
-      setTimeout(() => (el.className = "countdown"), 500);
+      setTimeout(() => el.classList.remove("show"), 450);
     }
   };
-  step();
+  setTimeout(step, 300);
 }
 
 /* ---------- keyboard + focus ---------- */
@@ -711,7 +765,10 @@ document.addEventListener("keydown", e => {
     if (e.key === "Escape") { e.preventDefault(); closeModals(); focusInput(); }
     return;
   }
-  const resultsUp = $("#results").classList.contains("show");
+  const k = kb.keyFromEvent(e.key);
+  if (k && !e.ctrlKey && !e.metaKey && !e.altKey) { kb.press(k); lastPhysical = performance.now(); }
+  lastKey = performance.now();
+
   const inMpRace = race && race.kind === "mp" && !race.done;
   if (e.key === "Tab") {
     e.preventDefault();
@@ -724,9 +781,15 @@ document.addEventListener("keydown", e => {
     else newRace(race.text);
     return;
   }
-  if (e.key === "Enter" && resultsUp) { e.preventDefault(); again(); return; }
-  if (!resultsUp && document.activeElement !== inp && e.key.length === 1 && !e.metaKey && !e.ctrlKey && !e.altKey) focusInput();
+  if (e.key === "Enter" && resultsOpen()) { e.preventDefault(); again(); return; }
+  if (!resultsOpen() && document.activeElement !== inp && e.key.length === 1 && !e.metaKey && !e.ctrlKey && !e.altKey) focusInput();
 });
+document.addEventListener("keyup", e => {
+  const k = kb.keyFromEvent(e.key);
+  if (k) kb.release(k);
+  if (e.key === "Shift") kb.release("shift");
+});
+window.addEventListener("blur", kb.releaseAll);
 document.addEventListener("pointerdown", audio.unlock);
 
 typebox.addEventListener("click", () => inp.focus());
@@ -736,6 +799,12 @@ inp.addEventListener("blur", () => setTimeout(() => {
 }, 120));
 
 /* ---------- start ---------- */
+$("#brandMark").outerHTML = markSVG();
+$("#footMark").outerHTML = markSVG();
+$$("[data-icon]").forEach(el => el.insertAdjacentHTML("afterbegin", icon(el.dataset.icon)));
+$("#meter").innerHTML = "<i></i>".repeat(NITRO_EVERY);
+buildGauge();
+kb.build($("#kb"));
 applyTheme();
 applySound();
 const startUnlocks = checkUnlocks(progress(), profile.unlocked);
