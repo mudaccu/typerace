@@ -4,82 +4,102 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>typerace</title>
-<meta name="description" content="race bots and your friends by typing. how fast are your fingers fr?">
-<meta property="og:title" content="typerace 🏁">
-<meta property="og:description" content="race bots and your friends by typing. how fast are your fingers fr?">
-<meta name="theme-color" content="#0e0e10">
-<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🏁</text></svg>">
+<meta name="description" content="Race bots, ghosts and your friends by typing. How fast are your fingers?">
+<meta property="og:title" content="typerace">
+<meta property="og:description" content="Race bots, ghosts and your friends by typing. How fast are your fingers?">
+<meta name="theme-color" content="#15151A">
+<link rel="icon" href="favicon.svg" type="image/svg+xml">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600&family=Space+Grotesk:wght@400;500;700&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Archivo:ital,wdth,wght@0,62..125,100..900;1,62..125,100..900&family=Geist+Mono:wght@400;500;600&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="style.css">
 <script type="module" src="js/main.js"></script>
 </head>
 <body>
 <div class="wrap">
   <header>
-    <div class="logo">type<b>race</b></div>
+    <a class="brand" href="/" aria-label="typerace home"><span id="brandMark"></span><span class="word">type<em>race</em></span></a>
     <nav class="icons">
-      <button class="icon-btn" data-open="garage" title="garage" aria-label="garage">🚗</button>
-      <button class="icon-btn" data-open="stats" title="your stats" aria-label="your stats">📊</button>
-      <button class="icon-btn" data-open="board" title="leaderboard" aria-label="leaderboard">🏆</button>
-      <button class="icon-btn" data-open="mp" title="race friends" aria-label="race friends">👥<i class="dot" id="roomDot"></i></button>
-      <button class="icon-btn" id="sound" title="sound on/off" aria-label="sound on/off">🔊</button>
-      <button class="icon-btn" id="theme" title="light/dark" aria-label="light/dark">◐</button>
+      <button class="icon-btn" data-open="garage" data-icon="car" title="Garage" aria-label="Garage"></button>
+      <button class="icon-btn" data-open="stats" data-icon="chart" title="Your stats" aria-label="Your stats"></button>
+      <button class="icon-btn" data-open="board" data-icon="trophy" title="Leaderboard" aria-label="Leaderboard"></button>
+      <button class="icon-btn" data-open="mp" data-icon="users" title="Race friends" aria-label="Race friends"><i class="dot" id="roomDot"></i></button>
+      <span class="sep"></span>
+      <button class="icon-btn" id="sound" title="Sound" aria-label="Sound on or off"></button>
+      <button class="icon-btn" id="theme" data-icon="contrast" title="Light / dark" aria-label="Light or dark theme"></button>
     </nav>
   </header>
 
-  <div class="controls" id="controls">
-    <div class="pills" id="contentPills">
-      <button class="pill" data-content="words">words</button>
-      <button class="pill" data-content="quotes">quotes</button>
-      <button class="pill" data-content="slang">slang</button>
-      <button class="pill" data-content="code">code</button>
-      <button class="pill" data-content="punct">punct.</button>
+  <div class="toolbar" id="controls">
+    <div class="seg" id="contentPills">
+      <button data-content="words">words</button>
+      <button data-content="quotes">quotes</button>
+      <button data-content="slang">slang</button>
+      <button data-content="code">code</button>
+      <button data-content="punct">punctuation</button>
     </div>
-    <div class="pills" id="lengthPills">
-      <button class="pill" data-length="sprint">sprint</button>
-      <button class="pill" data-length="race">race</button>
-      <button class="pill" data-length="marathon">marathon</button>
+    <div class="seg" id="lengthPills">
+      <button data-length="sprint">sprint</button>
+      <button data-length="race">race</button>
+      <button data-length="marathon">marathon</button>
     </div>
-    <button class="chip" id="daily">📅 daily</button>
-    <button class="chip room" id="roomChip" hidden>👥 room <b id="roomCode"></b></button>
+    <button class="chip" id="daily" data-icon="calendar"><span>daily</span></button>
+    <button class="chip room" id="roomChip" data-icon="users" hidden><span>room <b id="roomCode"></b></span></button>
   </div>
 
-  <div class="stats">
-    <div class="stat"><div class="n" id="wpm">0</div><div class="l">wpm</div></div>
-    <div class="stat"><div class="n" id="acc">100</div><div class="l">accuracy %</div></div>
-    <div class="stat"><div class="n" id="time">0.0</div><div class="l">seconds</div></div>
-    <div class="stat"><div class="n" id="combo">0</div><div class="l">combo <span class="meter"><i id="meter"></i></span></div></div>
-    <div class="stat pb"><div class="n" id="pb">—</div><div class="l">personal best</div></div>
-  </div>
+  <section class="dash">
+    <div class="gauge">
+      <svg viewBox="0 0 160 128" aria-label="words per minute">
+        <path class="g-track" d="M24.6 112A64 64 0 1 1 135.4 112"/>
+        <path class="g-red" d="M135.4 48A64 64 0 0 1 135.4 112"/>
+        <path class="g-fill" id="gFill" pathLength="100" d="M24.6 112A64 64 0 1 1 135.4 112"/>
+        <g id="gTicks"></g>
+        <path class="g-needle" id="gNeedle" d="M80 83L78.7 80L80 30L81.3 80Z"/>
+        <circle class="g-hub" cx="80" cy="80" r="5"/>
+        <text class="g-num" id="wpm" x="80" y="113">0</text>
+        <text class="g-unit" x="80" y="125">WPM</text>
+      </svg>
+    </div>
+    <div class="readouts">
+      <div class="ro"><span class="lbl">accuracy</span><div class="val"><b id="acc">100</b><small>%</small></div></div>
+      <div class="ro"><span class="lbl">time</span><div class="val"><b id="time">0.0</b><small>s</small></div></div>
+      <div class="ro"><span class="lbl">nitro <span class="combo" id="combo"></span></span><div class="nbar" id="meter"></div></div>
+      <div class="ro pb"><span class="lbl">best</span><div class="val"><b id="pb">—</b><small>wpm</small></div></div>
+    </div>
+  </section>
 
   <div class="track" id="track">
+    <div class="startline"></div>
     <div class="finish"></div>
-    <div class="countdown" id="countdown"></div>
-    <div class="boost" id="boost">nitro 🔥</div>
+    <div class="lights" id="lights"><i></i><i></i><i></i></div>
+    <div class="boost" id="boost">NITRO</div>
   </div>
 
   <div class="typebox" id="typebox">
     <div class="text" id="text"></div>
     <div class="focus-hint">click here or press any key to focus</div>
-    <textarea id="inp" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" aria-label="type here"></textarea>
+    <textarea id="inp" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" aria-label="Type here"></textarea>
   </div>
 
+  <div class="kb" id="kb"></div>
+
   <div class="hint">
-    <span id="hintMain">start typing to launch 🏎️</span>
-    <span>10 clean words = nitro 🔥</span>
+    <span data-icon="flag">start typing to launch</span>
+    <span data-icon="flame">10 clean words = nitro</span>
     <span><kbd>tab</kbd> new race</span>
     <span><kbd>esc</kbd> restart</span>
-    <span id="hintRank"></span>
+    <span class="rank" id="hintRank"></span>
   </div>
 </div>
-<footer>no sign up. no ads. just vibes and fingers.</footer>
+<footer><span id="footMark"></span>built for fast fingers</footer>
 
 <!-- results -->
 <div class="overlay" id="results">
-  <div class="card">
-    <div class="place" id="r-place"></div>
+  <div class="card result">
+    <div class="podium">
+      <span class="pos" id="r-pos">P1</span>
+      <div><div class="place" id="r-place"></div><div class="mode" id="r-mode"></div></div>
+    </div>
     <div class="big"><span id="r-wpm">0</span><small>wpm</small></div>
     <div class="newpb" id="r-pb"></div>
     <div class="vibe" id="r-vibe"></div>
@@ -92,8 +112,8 @@
     <div id="r-unlocks"></div>
     <div class="extra online" id="r-online"></div>
     <div class="btns">
-      <button class="btn" id="share">share card</button>
-      <button class="btn primary" id="again">run it back ↵</button>
+      <button class="btn" id="share" data-icon="share"><span>share card</span></button>
+      <button class="btn primary" id="again"><span>run it back</span><kbd>enter</kbd></button>
     </div>
   </div>
 </div>
@@ -101,33 +121,33 @@
 <!-- modals -->
 <div class="overlay modal" id="m-garage">
   <div class="card wide">
-    <div class="m-head"><h2>garage 🚗</h2><button class="x" data-close aria-label="close">✕</button></div>
-    <p class="sub left">unlock new rides by racing. tap one to drive it.</p>
+    <div class="m-head"><h2>Garage</h2><button class="x" data-close data-icon="x" aria-label="Close"></button></div>
+    <p class="sub">Unlock new rides by racing. Tap one to drive it.</p>
     <div class="garage" id="garageGrid"></div>
   </div>
 </div>
 
 <div class="overlay modal" id="m-stats">
   <div class="card wide">
-    <div class="m-head"><h2>your stats 📊</h2><button class="x" data-close aria-label="close">✕</button></div>
+    <div class="m-head"><h2>Your stats</h2><button class="x" data-close data-icon="x" aria-label="Close"></button></div>
     <div id="statsBody"></div>
   </div>
 </div>
 
 <div class="overlay modal" id="m-board">
   <div class="card wide">
-    <div class="m-head"><h2>leaderboard 🏆</h2><button class="x" data-close aria-label="close">✕</button></div>
+    <div class="m-head"><h2>Leaderboard</h2><button class="x" data-close data-icon="x" aria-label="Close"></button></div>
     <div class="tabs">
-      <div class="pills" id="boardMode">
-        <button class="pill" data-v="sprint">sprint</button>
-        <button class="pill" data-v="race">race</button>
-        <button class="pill" data-v="marathon">marathon</button>
-        <button class="pill" data-v="daily">daily</button>
+      <div class="seg small" id="boardMode">
+        <button data-v="sprint">sprint</button>
+        <button data-v="race">race</button>
+        <button data-v="marathon">marathon</button>
+        <button data-v="daily">daily</button>
       </div>
-      <div class="pills" id="boardPeriod">
-        <button class="pill" data-v="today">today</button>
-        <button class="pill" data-v="week">week</button>
-        <button class="pill" data-v="all">all time</button>
+      <div class="seg small" id="boardPeriod">
+        <button data-v="today">today</button>
+        <button data-v="week">week</button>
+        <button data-v="all">all time</button>
       </div>
     </div>
     <div id="boardBody"></div>
@@ -136,15 +156,15 @@
 
 <div class="overlay modal" id="m-mp">
   <div class="card wide narrow">
-    <div class="m-head"><h2>race friends 👥</h2><button class="x" data-close aria-label="close">✕</button></div>
+    <div class="m-head"><h2>Race friends</h2><button class="x" data-close data-icon="x" aria-label="Close"></button></div>
     <div id="mpBody"></div>
   </div>
 </div>
 
 <div class="overlay modal" id="m-name">
   <div class="card wide narrow">
-    <div class="m-head"><h2>pick a name ✍️</h2><button class="x" data-close aria-label="close">✕</button></div>
-    <p class="sub left">this shows on the leaderboard and in rooms. letters, numbers, spaces, _ . - (max 16).</p>
+    <div class="m-head"><h2>Pick a name</h2><button class="x" data-close data-icon="x" aria-label="Close"></button></div>
+    <p class="sub">Shows on the leaderboard and in rooms. Letters, numbers, spaces, _ . - (max 16).</p>
     <input class="field" id="nameInput" maxlength="16" placeholder="speedy_gonzales" autocomplete="off">
     <button class="btn primary full" id="nameSave">save</button>
   </div>

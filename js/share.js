@@ -1,8 +1,9 @@
 // Draws a 1080x1350 result card (good for Instagram/TikTok) and shares or downloads it.
 import { carSVG } from "./cars.js";
+import { MARK_PATHS } from "./icons.js";
 
 const W = 1080, H = 1350;
-const BG = "#0e0e10", INK = "#f2f2ec", MUTED = "#7a7a82", LINE = "#2a2a30", LIME = "#c6ff3d";
+const BG = "#15151A", PAPER = "#F3F1EC", MUTED = "#8E8B84", LINE = "#2C2C34", ACCENT = "#FF5A2A", ASPHALT = "#24242B";
 
 const loadImg = src => new Promise((res, rej) => {
   const i = new Image();
@@ -11,21 +12,27 @@ const loadImg = src => new Promise((res, rej) => {
   i.src = src;
 });
 
-function pill(x, cx, cy, text, font, bg, fg, padX = 40, h = 90) {
-  x.font = font;
-  const w = x.measureText(text).width + padX * 2;
-  x.fillStyle = bg;
-  x.beginPath();
-  x.roundRect(cx - w / 2, cy - h / 2, w, h, h / 2);
-  x.fill();
-  x.fillStyle = fg;
-  x.fillText(text, cx, cy + 2);
+function font(x, style) {
+  x.font = style;
+  if ("fontStretch" in x) x.fontStretch = style.includes("italic") ? "expanded" : "normal";
+}
+
+function drawMark(x, px, py, size) {
+  x.save();
+  x.translate(px, py);
+  x.scale(size / 32, size / 32);
+  x.fillStyle = "#2C2C35"; x.fill(new Path2D(MARK_PATHS.base));
+  x.fillStyle = "#3B3B46"; x.fill(new Path2D(MARK_PATHS.face));
+  x.strokeStyle = "rgba(243,241,236,.55)"; x.lineWidth = 1.6; x.lineCap = "round"; x.stroke(new Path2D(MARK_PATHS.speed));
+  x.fillStyle = ACCENT; x.fill(new Path2D(MARK_PATHS.t));
+  x.fillStyle = PAPER; x.fill(new Path2D(MARK_PATHS.checker));
+  x.restore();
 }
 
 export async function makeCard(r) {
   await Promise.all([
-    document.fonts.load('700 64px "Space Grotesk"'),
-    document.fonts.load('600 300px "JetBrains Mono"'),
+    document.fonts.load('italic 900 100px "Archivo"'),
+    document.fonts.load('700 40px "Archivo"'),
   ]).catch(() => {});
 
   const c = document.createElement("canvas");
@@ -33,73 +40,89 @@ export async function makeCard(r) {
   const x = c.getContext("2d");
   x.fillStyle = BG;
   x.fillRect(0, 0, W, H);
-  x.textBaseline = "middle";
+  x.textBaseline = "alphabetic";
 
-  // logo
-  x.font = '700 64px "Space Grotesk", sans-serif';
-  x.fillStyle = INK;
-  x.fillText("type", 80, 122);
-  const tw = x.measureText("type").width, rw = x.measureText("race").width;
-  x.fillStyle = LIME;
-  x.beginPath();
-  x.roundRect(80 + tw + 8, 82, rw + 28, 82, 16);
-  x.fill();
-  x.fillStyle = "#121212";
-  x.fillText("race", 80 + tw + 22, 124);
-
+  // brand
+  drawMark(x, 80, 76, 64);
+  font(x, 'italic 800 52px "Archivo", sans-serif');
+  x.fillStyle = PAPER;
+  x.fillText("type", 164, 126);
+  const tw = x.measureText("type").width;
+  x.fillStyle = ACCENT;
+  x.fillText("race", 164 + tw, 126);
+  font(x, '700 26px "Archivo", sans-serif');
+  x.fillStyle = MUTED;
   x.textAlign = "right";
-  x.font = '500 36px "Space Grotesk", sans-serif';
+  x.fillText(r.label.toUpperCase(), W - 80, 120);
+  x.textAlign = "left";
+
+  // position + speed
+  font(x, 'italic 900 190px "Archivo", sans-serif');
+  x.fillStyle = ACCENT;
+  x.fillText("P" + r.place, 72, 380);
+  const pw = x.measureText("P" + r.place).width;
+  font(x, '700 40px "Archivo", sans-serif');
+  x.fillStyle = PAPER;
+  x.fillText(r.place === 1 ? "won the race" : r.placeText, 72 + pw + 30, 300);
   x.fillStyle = MUTED;
-  x.fillText(r.label, W - 80, 124);
+  font(x, '600 32px "Archivo", sans-serif');
+  x.fillText("typing speed", 72 + pw + 30, 350);
 
-  x.textAlign = "center";
-  x.font = '500 48px "Space Grotesk", sans-serif';
-  x.fillText(r.placeText, W / 2, 300);
-
-  x.font = '600 300px "JetBrains Mono", monospace';
-  x.fillStyle = INK;
-  x.fillText(String(r.wpm), W / 2, 480);
-  x.font = '500 52px "JetBrains Mono", monospace';
+  font(x, 'italic 900 300px "Archivo", sans-serif');
+  x.fillStyle = PAPER;
+  x.fillText(String(r.wpm), 64, 680);
+  const ww = x.measureText(String(r.wpm)).width;
+  font(x, 'italic 800 64px "Archivo", sans-serif');
   x.fillStyle = MUTED;
-  x.fillText("wpm", W / 2, 650);
+  x.fillText("WPM", 64 + ww + 24, 680);
 
-  pill(x, W / 2, 770, r.vibe, '700 46px "Space Grotesk", sans-serif', LIME, "#121212");
+  // vibe
+  font(x, 'italic 800 42px "Archivo", sans-serif');
+  const vw = x.measureText(r.vibe).width + 56;
+  x.fillStyle = "rgba(255,90,42,.16)";
+  x.beginPath(); x.roundRect(72, 730, vw, 76, 14); x.fill();
+  x.fillStyle = ACCENT;
+  x.fillText(r.vibe, 100, 782);
 
-  const boxes = [[r.acc + "%", "accuracy"], [r.secs.toFixed(1) + "s", "time"], [String(r.nitros), "nitros"]];
-  const bw = 280, gap = 30, bx = (W - (bw * 3 + gap * 2)) / 2;
+  // stat boxes
+  const boxes = [[r.acc + "%", "ACCURACY"], [r.secs.toFixed(1) + "s", "TIME"], [String(r.nitros), "NITROS"]];
+  const bw = (W - 144 - 32) / 3;
   boxes.forEach(([v, l], i) => {
-    const X = bx + i * (bw + gap);
-    x.strokeStyle = LINE;
-    x.lineWidth = 3;
-    x.beginPath();
-    x.roundRect(X, 880, bw, 150, 28);
-    x.stroke();
-    x.fillStyle = INK;
-    x.font = '600 54px "JetBrains Mono", monospace';
-    x.fillText(v, X + bw / 2, 940);
+    const X = 72 + i * (bw + 16);
+    x.fillStyle = "#1E1E25";
+    x.beginPath(); x.roundRect(X, 850, bw, 150, 22); x.fill();
+    font(x, 'italic 800 58px "Archivo", sans-serif');
+    x.fillStyle = PAPER;
+    x.fillText(v, X + 30, 935);
+    font(x, '700 22px "Archivo", sans-serif');
     x.fillStyle = MUTED;
-    x.font = '500 28px "Space Grotesk", sans-serif';
-    x.fillText(l, X + bw / 2, 992);
+    x.fillText(l, X + 30, 975);
   });
 
-  // road, finish line and your car
-  x.fillStyle = LINE;
-  for (let X = 80; X < W - 120; X += 64) x.fillRect(X, 1192, 34, 6);
-  for (let row = 0; row < 8; row++) for (let col = 0; col < 2; col++) {
-    if ((row + col) % 2) continue;
-    x.fillStyle = INK;
-    x.fillRect(W - 110 + col * 14, 1080 + row * 14, 14, 14);
+  // road with curbs, finish line and the car
+  const RY = 1050, RH = 170;
+  x.fillStyle = ASPHALT;
+  x.fillRect(0, RY, W, RH);
+  for (let X = 0; X < W; X += 48) {
+    x.fillStyle = (X / 48) % 2 ? PAPER : "#E5383B";
+    x.fillRect(X, RY, 48, 12);
+    x.fillRect(X, RY + RH - 12, 48, 12);
   }
-  const svg = carSVG(r.car, { ink: INK, hub: BG, glass: BG })
-    .replace("<svg ", '<svg xmlns="http://www.w3.org/2000/svg" width="320" height="140" ');
+  x.fillStyle = "rgba(255,255,255,.22)";
+  for (let X = 0; X < W; X += 80) x.fillRect(X, RY + RH / 2 - 2, 44, 4);
+  for (let row = 0; row < 7; row++) for (let col = 0; col < 2; col++) {
+    x.fillStyle = (row + col) % 2 ? "#15151A" : PAPER;
+    x.fillRect(W - 120 + col * 21, RY + 12 + row * 21, 21, 21);
+  }
   try {
-    const img = await loadImg("data:image/svg+xml;charset=utf-8," + encodeURIComponent(svg));
-    x.drawImage(img, W - 480, 1050, 320, 140);
-  } catch (e) { /* card still works without the car */ }
+    const img = await loadImg("data:image/svg+xml;charset=utf-8," + encodeURIComponent(carSVG(r.car, { xmlns: true }).replace("<svg ", '<svg width="420" height="138" ')));
+    x.drawImage(img, W - 560, RY + 22, 420, 138);
+  } catch (e) { /* the card still works without the car */ }
 
-  x.font = '500 36px "Space Grotesk", sans-serif';
+  font(x, '600 32px "Archivo", sans-serif');
   x.fillStyle = MUTED;
-  x.fillText(`think you can beat me? → ${location.host || "typerace"}`, W / 2, 1275);
+  x.textAlign = "center";
+  x.fillText(`think you can beat me?  ${location.host || "typerace"}`, W / 2, 1290);
 
   return new Promise(res => c.toBlob(res, "image/png"));
 }
@@ -107,7 +130,7 @@ export async function makeCard(r) {
 export async function shareCard(r) {
   const blob = await makeCard(r);
   const file = new File([blob], `typerace-${r.wpm}wpm.png`, { type: "image/png" });
-  const text = `just hit ${r.wpm} wpm on typerace 🏎️💨 think u can beat me? ${location.href.split("?")[0]}`;
+  const text = `I just hit ${r.wpm} WPM on typerace. Think you can beat me? ${location.href.split("?")[0]}`;
   if (navigator.canShare && navigator.canShare({ files: [file] })) {
     await navigator.share({ files: [file], text });
     return "shared";

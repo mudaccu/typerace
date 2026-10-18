@@ -1,5 +1,6 @@
 // The stats page: totals, a WPM chart of recent races, and bests per text type.
 import { runs, dayStreak } from "./store.js";
+import { icon } from "./icons.js";
 
 const avg = a => (a.length ? a.reduce((s, x) => s + x, 0) / a.length : 0);
 const CONTENT_LABELS = { words: "words", quotes: "quotes", slang: "slang", code: "code", punct: "punct." };
@@ -28,7 +29,7 @@ function chart(list) {
 
 export function renderStats(el) {
   if (!runs.length) {
-    el.innerHTML = `<p class="empty">no races yet. go type something 🏁</p>`;
+    el.innerHTML = `<p class="empty">No races yet. Go type something.</p>`;
     return;
   }
   const recent = runs.slice(-10);
@@ -40,7 +41,7 @@ export function renderStats(el) {
     [best, "best wpm"],
     [Math.round(avg(recent.map(r => r.wpm))), "avg wpm (last 10)"],
     [Math.round(avg(recent.map(r => r.acc))) + "%", "avg accuracy"],
-    [`${streak} 🔥`, "day streak"],
+    [`${streak}${icon("flame")}`, "day streak"],
     [words.toLocaleString(), "words typed"],
   ];
   const bests = Object.entries(CONTENT_LABELS).map(([k, label]) => {
