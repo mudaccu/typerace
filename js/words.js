@@ -110,12 +110,16 @@ function fromSentences(list, n, rand) {
   return out.join(" ");
 }
 
+// Prose reads properly: capital at the start of every sentence, and "i" on its own is "I".
+const sentenceCase = s => (s[0].toUpperCase() + s.slice(1)).replace(/\bi\b/g, "I");
+
 function punctuated(n, rand) {
-  return pickWords(n, rand).split(" ").map((w, i) => {
+  let newSentence = true;
+  return pickWords(n, rand).split(" ").map(w => {
     let x = w;
     const k = rand();
     if (k > 0.86) x = String(Math.floor(rand() * 1000));
-    else if (i === 0 || k < 0.14) x = x[0].toUpperCase() + x.slice(1);
+    else if (newSentence || k < 0.14) x = x[0].toUpperCase() + x.slice(1);
     const p = rand();
     if (p < 0.1) x += ",";
     else if (p < 0.16) x += ".";
@@ -124,6 +128,7 @@ function punctuated(n, rand) {
     else if (p < 0.24) x = `(${x})`;
     else if (p < 0.26) x = `"${x}"`;
     else if (p < 0.28) x += ";";
+    newSentence = /[.!?]$/.test(x);
     return x;
   }).join(" ");
 }
@@ -131,8 +136,8 @@ function punctuated(n, rand) {
 export function makeText(content, length, rand = Math.random) {
   const n = LENGTHS[length] || LENGTHS.race;
   switch (content) {
-    case "quotes": return fromSentences(QUOTES, n, rand);
-    case "slang": return fromSentences(SLANG, n, rand);
+    case "quotes": return fromSentences(QUOTES.map(sentenceCase), n, rand);
+    case "slang": return fromSentences(SLANG.map(sentenceCase), n, rand);
     case "code": return fromSentences(CODE, Math.round(n * 0.8), rand);
     case "punct": return punctuated(n, rand);
     default: return pickWords(n, rand);

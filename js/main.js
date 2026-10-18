@@ -4,6 +4,7 @@ import * as audio from "./audio.js";
 import { CARS, carSVG, carById, carDot, checkUnlocks } from "./cars.js";
 import { icon, markSVG } from "./icons.js";
 import * as kb from "./keyboard.js";
+import * as cockpit from "./cockpit.js";
 import { renderStats } from "./stats.js";
 import { shareCard } from "./share.js";
 import { online, leaderboard, topGhost, submit, rankToday } from "./online.js";
@@ -35,7 +36,7 @@ const NITRO_MS = 2500;
 const GAUGE_MAX = 160;
 const NAME_RE = /^[\p{L}\p{N}_ .-]{1,16}$/u;
 
-let race = null, chars = [], base = [];
+let race = null, chars = [], base = [], caret = null, puffs = 0;
 let shownWpm = 0, lastStat = 0, roadOff = 0, lastFrame = 0, lastKey = 0, lastSend = 0;
 let lastPhysical = 0, lastErrorAt = 0;
 let lastResult = null, mpLength = "race", afterName = null;
@@ -214,11 +215,26 @@ function renderText() {
   textEl.innerHTML = words.map((w, i) =>
     `<span class="w">${[...w].map(ch => `<span class="c">${esc(ch)}</span>`).join("")}</span>` +
     (i < words.length - 1 ? '<span class="c sp"> </span>' : "")
-  ).join("");
+  ).join("") + '<i class="caret"></i>';
+  caret = textEl.querySelector(".caret");
+  caret.style.transition = "none";   // jump straight to the start, then glide from there
   chars = [...textEl.querySelectorAll(".c")];
   base = chars.map(c => c.className);
   textEl.scrollTop = 0;
   paint();
+  requestAnimationFrame(() => (caret.style.transition = ""));
+}
+
+// The caret glides from letter to letter instead of jumping.
+function moveCaret() {
+  const n = race.typed.length, last = chars[chars.length - 1];
+  const at = chars[Math.min(n, chars.length - 1)];
+  if (!at) return;
+  const lineH = parseFloat(getComputedStyle(textEl).lineHeight);
+  const left = n >= chars.length ? last.offsetLeft + last.offsetWidth : at.offsetLeft;
+  caret.style.left = left - 1 + "px";
+  caret.style.top = at.offsetTop + (lineH - caret.offsetHeight) / 2 + "px";
+  textEl.scrollTop = Math.max(0, at.offsetTop - lineH);
 }
 
 function paint() {
@@ -229,11 +245,7 @@ function paint() {
     if (i === typed.length) cls += " cur";
     if (chars[i].className !== cls) chars[i].className = cls;
   }
-  const cur = chars[Math.min(typed.length, chars.length - 1)];
-  if (cur) {
-    const lineH = parseFloat(getComputedStyle(textEl).lineHeight);
-    textEl.scrollTop = Math.max(0, cur.offsetTop - textEl.offsetTop - lineH);
-  }
+  moveCaret();
   if (race.done || !race.live) kb.setNext(null);
   else if (correctLen(typed, text) < typed.length) kb.setNext("bksp");
   else kb.setNext(text[typed.length] ?? null);
@@ -306,8 +318,13 @@ inp.addEventListener("input", () => {
     r.errAtWord = r.errors;
     lastErrorAt = performance.now();
     kb.wrong(kb.keyFor(wrongChar).k);
+    cockpit.brake();
     audio.sfx.error();
-  } else if (added) audio.sfx.key();
+  } else if (added) {
+    audio.sfx.key();
+    cockpit.gas();
+    if (++puffs % 2) exhaustPuff();
+  } else cockpit.brake();   // backspace
 
   // a word counts as "clean" if no typo happened while typing it
   while (r.words < r.ends.length && cl >= r.ends[r.words]) {
@@ -332,6 +349,17 @@ function startClock() {
   race.t0 = performance.now();
   track.classList.add("moving");
   audio.engineStart();
+}
+
+// A little puff of smoke out of your exhaust while you type.
+function exhaustPuff() {
+  const me = race.racers[0];
+  if (!me.lane) return;
+  const p = document.createElement("i");
+  p.className = "puff";
+  p.style.left = me.x + 4 + "px";
+  me.lane.appendChild(p);
+  setTimeout(() => p.remove(), 800);
 }
 
 function nitro() {
@@ -380,6 +408,9 @@ function tick(now) {
     setCombo();
   }
   kb.setMood(moodFor(r, now));
+  const racing = r.started && !r.done;
+  kb.setRevs(racing ? shownWpm : 0, boosting);
+  if (cockpit.setGear(cockpit.gearFor(shownWpm, racing)) && racing) audio.sfx.shift();
 
   if (r.started && !r.done) {
     const ms = now - r.t0, secs = ms / 1000;
@@ -805,6 +836,7 @@ $$("[data-icon]").forEach(el => el.insertAdjacentHTML("afterbegin", icon(el.data
 $("#meter").innerHTML = "<i></i>".repeat(NITRO_EVERY);
 buildGauge();
 kb.build($("#kb"));
+cockpit.build($("#rig"));
 applyTheme();
 applySound();
 const startUnlocks = checkUnlocks(progress(), profile.unlocked);

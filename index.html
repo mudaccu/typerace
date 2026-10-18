@@ -19,6 +19,22 @@
 <div class="wrap">
   <header>
     <a class="brand" href="/" aria-label="typerace home"><span id="brandMark"></span><span class="word">type<em>race</em></span></a>
+    <div class="toolbar" id="controls">
+      <div class="seg" id="contentPills">
+        <button data-content="words">words</button>
+        <button data-content="quotes">quotes</button>
+        <button data-content="slang">slang</button>
+        <button data-content="code">code</button>
+        <button data-content="punct">punctuation</button>
+      </div>
+      <div class="seg" id="lengthPills">
+        <button data-length="sprint">sprint</button>
+        <button data-length="race">race</button>
+        <button data-length="marathon">marathon</button>
+      </div>
+      <button class="chip" id="daily" data-icon="calendar"><span>daily</span></button>
+      <button class="chip room" id="roomChip" data-icon="users" hidden><span>room <b id="roomCode"></b></span></button>
+    </div>
     <nav class="icons">
       <button class="icon-btn" data-open="garage" data-icon="car" title="Garage" aria-label="Garage"></button>
       <button class="icon-btn" data-open="stats" data-icon="chart" title="Your stats" aria-label="Your stats"></button>
@@ -30,43 +46,6 @@
     </nav>
   </header>
 
-  <div class="toolbar" id="controls">
-    <div class="seg" id="contentPills">
-      <button data-content="words">words</button>
-      <button data-content="quotes">quotes</button>
-      <button data-content="slang">slang</button>
-      <button data-content="code">code</button>
-      <button data-content="punct">punctuation</button>
-    </div>
-    <div class="seg" id="lengthPills">
-      <button data-length="sprint">sprint</button>
-      <button data-length="race">race</button>
-      <button data-length="marathon">marathon</button>
-    </div>
-    <button class="chip" id="daily" data-icon="calendar"><span>daily</span></button>
-    <button class="chip room" id="roomChip" data-icon="users" hidden><span>room <b id="roomCode"></b></span></button>
-  </div>
-
-  <section class="dash">
-    <div class="gauge">
-      <svg viewBox="0 0 160 128" aria-label="words per minute">
-        <path class="g-track" d="M24.6 112A64 64 0 1 1 135.4 112"/>
-        <path class="g-red" d="M135.4 48A64 64 0 0 1 135.4 112"/>
-        <path class="g-fill" id="gFill" pathLength="100" d="M24.6 112A64 64 0 1 1 135.4 112"/>
-        <g id="gTicks"></g>
-        <path class="g-needle" id="gNeedle" d="M80 83L78.7 80L80 30L81.3 80Z"/>
-        <circle class="g-hub" cx="80" cy="80" r="5"/>
-        <text class="g-num" id="wpm" x="80" y="113">0</text>
-        <text class="g-unit" x="80" y="125">WPM</text>
-      </svg>
-    </div>
-    <div class="readouts">
-      <div class="ro"><span class="lbl">accuracy</span><div class="val"><b id="acc">100</b><small>%</small></div></div>
-      <div class="ro"><span class="lbl">time</span><div class="val"><b id="time">0.0</b><small>s</small></div></div>
-      <div class="ro"><span class="lbl">nitro <span class="combo" id="combo"></span></span><div class="nbar" id="meter"></div></div>
-      <div class="ro pb"><span class="lbl">best</span><div class="val"><b id="pb">—</b><small>wpm</small></div></div>
-    </div>
-  </section>
 
   <div class="track" id="track">
     <div class="startline"></div>
@@ -81,7 +60,30 @@
     <textarea id="inp" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" aria-label="Type here"></textarea>
   </div>
 
-  <div class="kb" id="kb"></div>
+  <section class="cockpit" id="cockpit">
+    <div class="cluster">
+      <div class="gauge">
+        <svg viewBox="0 0 160 128" aria-label="words per minute">
+          <path class="g-track" d="M24.6 112A64 64 0 1 1 135.4 112"/>
+          <path class="g-red" d="M135.4 48A64 64 0 0 1 135.4 112"/>
+          <path class="g-fill" id="gFill" pathLength="100" d="M24.6 112A64 64 0 1 1 135.4 112"/>
+          <g id="gTicks"></g>
+          <path class="g-needle" id="gNeedle" d="M80 83L78.7 80L80 30L81.3 80Z"/>
+          <circle class="g-hub" cx="80" cy="80" r="5"/>
+          <text class="g-num" id="wpm" x="80" y="113">0</text>
+          <text class="g-unit" x="80" y="125">WPM</text>
+        </svg>
+      </div>
+      <div class="minis">
+        <div class="mini"><span class="lbl">acc</span><b id="acc">100</b><small>%</small></div>
+        <div class="mini"><span class="lbl">time</span><b id="time">0.0</b><small>s</small></div>
+        <div class="mini"><span class="lbl">best</span><b id="pb">—</b></div>
+        <div class="mini nitro-mini"><span class="lbl">nitro<span class="combo" id="combo"></span></span><div class="nbar" id="meter"></div></div>
+      </div>
+    </div>
+    <div class="kb" id="kb"></div>
+    <div class="rig" id="rig"></div>
+  </section>
 
   <div class="hint">
     <span data-icon="flag">start typing to launch</span>

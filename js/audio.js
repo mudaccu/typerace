@@ -64,6 +64,7 @@ export const sfx = {
   key: () => noise(0.025, 0.12, 2800 + Math.random() * 1600, 1.5),
   error: () => tone(130, 0.09, "square", 0.05),
   beep: hi => tone(hi ? 880 : 440, hi ? 0.4 : 0.15, "sine", 0.2),
+  shift: () => { noise(0.06, 0.18, 900, 2); tone(70, 0.08, "square", 0.04); },
   nitro: () => { noise(0.8, 0.35, 300, 1.2, 3200); tone(80, 0.7, "sawtooth", 0.05, 0, 260); },
   finish: () => [523, 659, 784, 1047].forEach((f, i) => tone(f, 0.28, "triangle", 0.14, i * 0.09)),
   unlock: () => [784, 1175, 1568].forEach((f, i) => tone(f, 0.22, "sine", 0.12, i * 0.08)),

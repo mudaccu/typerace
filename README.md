@@ -11,7 +11,8 @@ js/main.js          the game: racing, nitro, results, menus
 js/words.js         word list, quotes, slang, code lines, daily challenge
 js/cars.js          the garage: sports cars (drawn in code) + unlock rules
 js/icons.js         line icons + the logo mark
-js/keyboard.js      the on-screen keyboard with the reacting spacebar face
+js/keyboard.js      the racing keyboard: rev lights, reacting spacebar face
+js/cockpit.js       the gear shifter and pedals
 favicon.svg         the logo icon
 js/audio.js         sound effects (made in code, no audio files)
 js/stats.js         the stats page + chart

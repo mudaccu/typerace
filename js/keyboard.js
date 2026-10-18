@@ -19,7 +19,8 @@ const FACE = `<svg class="face" viewBox="0 0 60 20" aria-hidden="true">
   <g class="m sleep"><path class="st" d="M21.8 8.6h4.4M33.8 8.6h4.4M28.8 13.4h2.4"/><path class="st z" d="M45 2.5h3.2l-3.2 3.6h3.2"/></g>
 </svg>`;
 
-let root = null, led = null, mood = "";
+const REVS = 15, REV_MAX = 130;
+let root = null, led = null, mood = "", revs = [], revLit = -1, revBoost = false;
 const keys = {};
 let nextOn = [];
 
@@ -45,11 +46,22 @@ const legend = k =>
 export function build(el) {
   root = el;
   el.innerHTML =
-    `<div class="kb-top"><i class="led"></i><span>typerace mk-1</span><span class="kb-screws"><i></i><i></i></span></div>` +
+    `<div class="kb-top"><span class="dial"></span><i class="led"></i><div class="revs">${"<i></i>".repeat(REVS)}</div><span class="kb-name">mk-1</span><span class="dial"></span></div>` +
     ROWS.map(row => `<div class="kb-row">${row.map(k => `<div class="key" data-k="${k}">${legend(k)}</div>`).join("")}</div>`).join("");
   el.querySelectorAll(".key").forEach(n => (keys[n.dataset.k] = n));
   led = el.querySelector(".led");
+  revs = [...el.querySelectorAll(".revs i")];
   setMood("idle");
+}
+
+// F1-style shift lights across the top: green, then amber, then red as you speed up.
+export function setRevs(wpm, boosting) {
+  const lit = Math.round((Math.min(wpm, REV_MAX) / REV_MAX) * REVS);
+  if (lit === revLit && boosting === revBoost) return;
+  revLit = lit;
+  revBoost = boosting;
+  revs.forEach((n, i) => n.classList.toggle("on", i < lit));
+  root.classList.toggle("boost", boosting);
 }
 
 export function press(k) {
