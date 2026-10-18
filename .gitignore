@@ -1,0 +1,4 @@
+.claude/
+*.zip
+node_modules/
+.vercel/

@@ -4,35 +4,61 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>typerace</title>
-<meta name="description" content="race bots by typing. how fast are your fingers fr?">
+<meta name="description" content="race bots and your friends by typing. how fast are your fingers fr?">
+<meta property="og:title" content="typerace 🏁">
+<meta property="og:description" content="race bots and your friends by typing. how fast are your fingers fr?">
+<meta name="theme-color" content="#0e0e10">
 <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🏁</text></svg>">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600&family=Space+Grotesk:wght@400;500;700&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="style.css">
+<script type="module" src="js/main.js"></script>
 </head>
 <body>
 <div class="wrap">
   <header>
     <div class="logo">type<b>race</b></div>
-    <div class="right">
-      <div class="pills" id="modes">
-        <button class="pill" data-mode="sprint">sprint</button>
-        <button class="pill on" data-mode="race">race</button>
-        <button class="pill" data-mode="marathon">marathon</button>
-      </div>
-      <button class="icon-btn" id="theme" title="toggle theme" aria-label="toggle theme">◐</button>
-    </div>
+    <nav class="icons">
+      <button class="icon-btn" data-open="garage" title="garage" aria-label="garage">🚗</button>
+      <button class="icon-btn" data-open="stats" title="your stats" aria-label="your stats">📊</button>
+      <button class="icon-btn" data-open="board" title="leaderboard" aria-label="leaderboard">🏆</button>
+      <button class="icon-btn" data-open="mp" title="race friends" aria-label="race friends">👥<i class="dot" id="roomDot"></i></button>
+      <button class="icon-btn" id="sound" title="sound on/off" aria-label="sound on/off">🔊</button>
+      <button class="icon-btn" id="theme" title="light/dark" aria-label="light/dark">◐</button>
+    </nav>
   </header>
+
+  <div class="controls" id="controls">
+    <div class="pills" id="contentPills">
+      <button class="pill" data-content="words">words</button>
+      <button class="pill" data-content="quotes">quotes</button>
+      <button class="pill" data-content="slang">slang</button>
+      <button class="pill" data-content="code">code</button>
+      <button class="pill" data-content="punct">punct.</button>
+    </div>
+    <div class="pills" id="lengthPills">
+      <button class="pill" data-length="sprint">sprint</button>
+      <button class="pill" data-length="race">race</button>
+      <button class="pill" data-length="marathon">marathon</button>
+    </div>
+    <button class="chip" id="daily">📅 daily</button>
+    <button class="chip room" id="roomChip" hidden>👥 room <b id="roomCode"></b></button>
+  </div>
 
   <div class="stats">
     <div class="stat"><div class="n" id="wpm">0</div><div class="l">wpm</div></div>
     <div class="stat"><div class="n" id="acc">100</div><div class="l">accuracy %</div></div>
     <div class="stat"><div class="n" id="time">0.0</div><div class="l">seconds</div></div>
+    <div class="stat"><div class="n" id="combo">0</div><div class="l">combo <span class="meter"><i id="meter"></i></span></div></div>
     <div class="stat pb"><div class="n" id="pb">—</div><div class="l">personal best</div></div>
   </div>
 
-  <div class="track" id="track"><div class="finish"></div></div>
+  <div class="track" id="track">
+    <div class="finish"></div>
+    <div class="countdown" id="countdown"></div>
+    <div class="boost" id="boost">nitro 🔥</div>
+  </div>
 
   <div class="typebox" id="typebox">
     <div class="text" id="text"></div>
@@ -41,31 +67,89 @@
   </div>
 
   <div class="hint">
-    <span>start typing to launch 🏎️</span>
+    <span id="hintMain">start typing to launch 🏎️</span>
+    <span>10 clean words = nitro 🔥</span>
     <span><kbd>tab</kbd> new race</span>
     <span><kbd>esc</kbd> restart</span>
+    <span id="hintRank"></span>
   </div>
 </div>
 <footer>no sign up. no ads. just vibes and fingers.</footer>
 
+<!-- results -->
 <div class="overlay" id="results">
   <div class="card">
-    <div class="place" id="r-place">you placed 1st</div>
+    <div class="place" id="r-place"></div>
     <div class="big"><span id="r-wpm">0</span><small>wpm</small></div>
     <div class="newpb" id="r-pb"></div>
-    <div class="vibe" id="r-vibe">main character energy</div>
+    <div class="vibe" id="r-vibe"></div>
     <div class="row">
       <div><b id="r-acc">100%</b><span>accuracy</span></div>
       <div><b id="r-time">0s</b><span>time</span></div>
       <div><b id="r-err">0</b><span>typos</span></div>
     </div>
+    <div class="extra" id="r-extra"></div>
+    <div id="r-unlocks"></div>
+    <div class="extra online" id="r-online"></div>
     <div class="btns">
-      <button class="btn" id="share">share flex</button>
+      <button class="btn" id="share">share card</button>
       <button class="btn primary" id="again">run it back ↵</button>
     </div>
   </div>
 </div>
 
-<script src="script.js"></script>
+<!-- modals -->
+<div class="overlay modal" id="m-garage">
+  <div class="card wide">
+    <div class="m-head"><h2>garage 🚗</h2><button class="x" data-close aria-label="close">✕</button></div>
+    <p class="sub left">unlock new rides by racing. tap one to drive it.</p>
+    <div class="garage" id="garageGrid"></div>
+  </div>
+</div>
+
+<div class="overlay modal" id="m-stats">
+  <div class="card wide">
+    <div class="m-head"><h2>your stats 📊</h2><button class="x" data-close aria-label="close">✕</button></div>
+    <div id="statsBody"></div>
+  </div>
+</div>
+
+<div class="overlay modal" id="m-board">
+  <div class="card wide">
+    <div class="m-head"><h2>leaderboard 🏆</h2><button class="x" data-close aria-label="close">✕</button></div>
+    <div class="tabs">
+      <div class="pills" id="boardMode">
+        <button class="pill" data-v="sprint">sprint</button>
+        <button class="pill" data-v="race">race</button>
+        <button class="pill" data-v="marathon">marathon</button>
+        <button class="pill" data-v="daily">daily</button>
+      </div>
+      <div class="pills" id="boardPeriod">
+        <button class="pill" data-v="today">today</button>
+        <button class="pill" data-v="week">week</button>
+        <button class="pill" data-v="all">all time</button>
+      </div>
+    </div>
+    <div id="boardBody"></div>
+  </div>
+</div>
+
+<div class="overlay modal" id="m-mp">
+  <div class="card wide narrow">
+    <div class="m-head"><h2>race friends 👥</h2><button class="x" data-close aria-label="close">✕</button></div>
+    <div id="mpBody"></div>
+  </div>
+</div>
+
+<div class="overlay modal" id="m-name">
+  <div class="card wide narrow">
+    <div class="m-head"><h2>pick a name ✍️</h2><button class="x" data-close aria-label="close">✕</button></div>
+    <p class="sub left">this shows on the leaderboard and in rooms. letters, numbers, spaces, _ . - (max 16).</p>
+    <input class="field" id="nameInput" maxlength="16" placeholder="speedy_gonzales" autocomplete="off">
+    <button class="btn primary full" id="nameSave">save</button>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
 </body>
 </html>
